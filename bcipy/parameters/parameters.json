@@ -894,7 +894,7 @@
     "type": "bool"
   },
   "high_voltage_value": {
-    "value": "6700",
+    "value": "5700",
     "section": "artifact_rejection",
     "readableName": "HighVoltage Threshold Value",
     "helpTip": "Set high voltage threshold value for artifact rejection.",
@@ -910,7 +910,7 @@
     "type": "bool"
   },
   "low_voltage_value": {
-    "value": "-2475",
+    "value": "-1700",
     "section": "artifact_rejection",
     "readableName": "LowVoltage Threshold Value",
     "helpTip": "Set low voltage threshold for artifact rejection.",

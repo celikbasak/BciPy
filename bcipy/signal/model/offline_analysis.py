@@ -173,8 +173,9 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters):
         rejection_suggestions = 0 
         trial += 1
 
-    print("Percent rejected: " + str((rejected_trials / trial_number) * 100))
+    print("Percent rejected: " + str((rejected_trials / 1000) * 100))
     print("Number of trials rejected: " + str(rejected_trials))
+    
     return trial_data, trial_labels
 
 def _remove_bad_data_by_sequence_(parameters):
