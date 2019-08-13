@@ -15,6 +15,8 @@ from bcipy.helpers.acquisition import analysis_channels,\
     analysis_channel_names_by_pos
 from bcipy.helpers.stimuli import play_sound
 
+import numpy as np
+
 # Configure logging correctly
 log = logging.getLogger(__name__)
 
@@ -87,11 +89,13 @@ def offline_analysis(data_folder: str = None,
                                 channel_map=channel_map,
                                 trial_length=trial_length)
 
-    x, y = _remove_bad_data(x, y, parameters)
+    x, y = _remove_bad_data_by_trial(x, y, parameters)
 
-    # k_folds = parameters.get('k_folds', 10)
+    k_folds = parameters.get('k_folds', 10)
 
-    # model, auc = train_pca_rda_kde_model(x, y, k_folds=k_folds)
+    model, auc = train_pca_rda_kde_model(x, y, k_folds=k_folds)
+
+    print("We got this Area Under Curve: " + str(auc))
 
     # log.info('Saving offline analysis plots!')
 
@@ -113,26 +117,69 @@ def offline_analysis(data_folder: str = None,
 
     # return model
 
-def _remove_bad_data(trial_data, trial_labels, parameters):
-    # invoke evaluator / rules
-    evaluator = Evaluator(parameters, True, False)
+def _remove_bad_data_by_trial(trial_data, trial_labels, parameters):
 
+    """ Removes bad data in a trial-by-trial fashion. Offline artifact rejection.
+        Args:
+        trial_data: a multidimensional array of Channels x Trials (chopped into 500ms chunks) x Voltages 
+        trial_labels: an ndarray of 0s (non-targets) and 1s (target), each representing a trial
+        parameter(dict): parameters to pull information for enabled rules and threshold values
+
+        How it works:
+        - 
+     """
+    
+    #get enabled rules
+    high_voltage_enabled = parameters['high_voltage_threshold']
+    low_voltage_enabled = parameters['low_voltage_threshold']
+
+    # invoke evaluator / rules
+    evaluator = Evaluator(parameters, True, True)
 
     # iterate over trial data, evaluate the trials, remove if needed and modify the trial labels to reflect
     channel_number = trial_data.shape[0]
     trial_number = trial_data[0].shape[0]
-    for ch in range(channel_number):
-        channel_data = trial_data[ch]
 
-        for trial in range(trial_number):
-            data = channel_data[trial]
+    trial = 0
+    rejected_trials = 0
+    rejection_suggestions = 0
+    bad_channel_threshold = 1
+
+    # NOTE:
+    # I changed the original for loop to a while loop
+    # in order to be able to skip ahead an index when we
+    # didn't find an artifact. I also subtract trial_number
+    # in the rejection_suggestions >= bad_channel_threshold
+    # as a way to sort of "stay in place" in indices when
+    # a trial is deleted
+
+    while trial < trial_number:
+        # go channel-wise through trials
+        for ch in range(channel_number):
+            data = trial_data[ch][trial]
+            # evaluate voltage samples from this trial
             response = evaluator.evaluate(data)
-            print(response)
-        
-        break
+            if not response:
+                rejection_suggestions += 1 
+                if rejection_suggestions >= bad_channel_threshold:
+                    # if the evaluator rejects the data and we've reached
+                    # the threshold, then delete the trial from each channel,
+                    # adjust trial labels to follow suit, then exit the loop
+                    trial_data = np.delete(trial_data,trial,axis=1)
+                    trial_labels = np.delete(trial_labels,trial)
+                    trial_number -= 1
+                    rejected_trials += 1
+                    break
+        rejection_suggestions = 0 
+        trial += 1
 
+    print("Percent rejected: " + str((rejected_trials / trial_number) * 100))
+    print("Number of trials rejected: " + str(rejected_trials))
+    return trial_data, trial_labels
 
-    return trial_data, trial_labels 
+def _remove_bad_data_by_sequence_(parameters):
+
+    pass
 
 
 if __name__ == "__main__":
