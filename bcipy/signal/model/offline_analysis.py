@@ -89,7 +89,7 @@ def offline_analysis(data_folder: str = None,
                                 channel_map=channel_map,
                                 trial_length=trial_length)
 
-    x, y = _remove_bad_data_by_trial(x, y, parameters)
+    x, y = _remove_bad_data_by_sequence(x, y, parameters,10)
 
     k_folds = parameters.get('k_folds', 10)
 
@@ -178,10 +178,64 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters):
     
     return trial_data, trial_labels
 
-def _remove_bad_data_by_sequence_(parameters):
+def _remove_bad_data_by_sequence(parameters,trial_data,trial_labels,trials_per_sequence):
 
-    pass
+     """ Removes bad data in a sequence-by-sequence fashion. Offline artifact rejection.
+        Args:
+        trial_data: a multidimensional array of Channels x Trials (chopped into 500ms chunks) x Voltages 
+        trial_labels: an ndarray of 0s (non-targets) and 1s (target), each representing a trial
+        parameter(dict): parameters to pull information for enabled rules and threshold values
 
+        How it works:
+        - 
+     """
+
+    #get enabled rules
+    high_voltage_enabled = parameters['high_voltage_threshold']
+    low_voltage_enabled = parameters['low_voltage_threshold']
+
+    # invoke evaluator / rules
+    evaluator = Evaluator(parameters, True, True)
+
+    # iterate over trial data, evaluate the sequences, remove if needed and modify the trial labels to reflect
+    channel_number = trial_data.shape[0]
+
+    # looping criteria changes by number of trials in a sequence rather than 1
+    # which is used in _remove_bad_data_by_trial
+    trial_number = trial_data[0].shape[0]
+
+    trial = 0
+    rejected_trials = 0
+    rejection_suggestions = 0
+    bad_trial_threshold = 1
+
+    while trial < trial_number:
+        # go channel-wise through trials
+        for ch in range(channel_number):
+            data = trial_data[ch][trial]
+            # evaluate voltage samples from this sequence
+            # by iterating through trials
+            for trials_within_sequence in range(trials_per_sequence):
+                response = evaluator.evaluate(data)
+                if not response:
+                    rejection_suggestions += 1 
+                    if rejection_suggestions >= bad_channel_threshold:
+                        # if the evaluator rejects the data and we've reached
+                        # the threshold, then delete the entire sequence from each channel,
+                        # adjust trial labels to follow suit, then exit the loop
+                        trial_data = np.delete(trial_data,trial:trial+trials_per_sequence,axis=1)
+                        trial_labels = np.delete(trial_labels,trial:trial+trials_per_sequence)
+                        trial_number -= trials_per_sequence
+                        rejected_sequences += 1
+                        break
+        rejection_suggestions = 0
+        trial += trials_per_sequence
+
+    sequences = trial_number // trials_per_sequence
+    print("Percent rejected: " + str((rejected_sequences / sequences) * 100))
+    print("Number of trials rejected: " + str(rejected_sequences))
+
+    return trial_data, trial_labels
 
 if __name__ == "__main__":
     import argparse
