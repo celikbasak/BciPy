@@ -90,10 +90,8 @@ def offline_analysis(data_folder: str = None,
                                 trial_length=trial_length)
 
     x_trial, y_trial = _remove_bad_data_by_trial(x, y, parameters, False)
-    x_trial_estimated, y_trial_estimated = _remove_bad_data_by_trial(x, y, parameters, True)
-    trials_per_sequence = parameters.get('stim_length')
+    trials_per_sequence = parameters['stim_length']
     x_sequence, y_sequence = _remove_bad_data_by_sequence(x, y, parameters, trials_per_sequence, False)
-    x_sequence_estimated, y_sequence_estimated = _remove_bad_data_by_sequence(x, y, parameters, trials_per_sequence, True)
 
     if x_sequence == [] or x_trial == []:
 
@@ -102,17 +100,11 @@ def offline_analysis(data_folder: str = None,
 
     k_folds = parameters.get('k_folds', 10)
 
-    model, auc_base = train_pca_rda_kde_model(x, y, k_folds=k_folds)
     model, auc_trial = train_pca_rda_kde_model(x_trial, y_trial, k_folds=k_folds)
-    model, auc_trial_estimated = train_pca_rda_kde_model(x_trial_estimated, y_trial_estimated, k_folds=k_folds)
     model, auc_sequence = train_pca_rda_kde_model(x_sequence, y_sequence, k_folds=k_folds)
-    model, auc_sequence_estimated = train_pca_rda_kde_model(x_sequence_estimated, y_sequence_estimated, k_folds=k_folds)
 
-    print("AUC Base: " + str(auc_base))
     print("AUC Trial: " + str(auc_trial))
-    print("AUC Trial Estimated Threshold: " + str(auc_trial_estimated))
     print("AUC Sequence: " + str(auc_sequence))
-    print("AUC Sequence Estimated Theshold " + str(auc_sequence_estimated))
 
     # log.info('Saving offline analysis plots!')
 
@@ -143,13 +135,6 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters,estimate):
         parameter(dict): parameters to pull information for enabled rules and threshold values
 
      """
-    if estimate:
-        # estimate best threshold
-        upper = np.amax(trial_data) * 0.3
-        lower = np.amin(trial_data) * 0.15
-        parameters['high_voltage_value'] = upper
-        parameters['low_voltage_value'] = lower
-    
     # get enabled rules
     high_voltage_enabled = parameters['high_voltage_threshold']
     low_voltage_enabled = parameters['low_voltage_threshold']
@@ -166,22 +151,20 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters,estimate):
     rejection_suggestions = 0
     bad_channel_threshold = 1
 
-    #import pdb; pdb.set_trace()
-
     while trial < trial_number:
         # go channel-wise through trials
         for ch in range(channel_number):
             data = trial_data[ch][trial]
             # evaluate voltage samples from this trial
-            response = evaluator.evaluate(data)
-            if not response:
+            response = evaluator.evaluate(data) 
+            if not response: # if False
                 rejection_suggestions += 1 
                 if rejection_suggestions >= bad_channel_threshold:
                     # if the evaluator rejects the data and we've reached
                     # the threshold, then delete the trial from each channel,
                     # adjust trial labels to follow suit, then exit the loop
-                    trial_data = np.delete(trial_data,trial,axis=1)
-                    trial_labels = np.delete(trial_labels,trial)
+                    trial_data = np.delete(trial_data, trial, axis=1)
+                    trial_labels = np.delete(trial_labels, trial)
                     trial_number -= 1
                     rejected_trials += 1
                     break
@@ -192,13 +175,12 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters,estimate):
 
     if estimate:
 
-        print("Percent Rejected Trial w/ Estimated Threshold: " + str(percent_rejected))
+        print('Percent Rejected Trial w/ Estimated Threshold: ' + str(percent_rejected))
 
-    else: print("Percent Rejected Trial: " + str(percent_rejected))
+    else: print('Percent Rejected Trial: ' + str(percent_rejected))
 
     if percent_rejected > 50.0:
-
-        return []
+        raise Exception(f'Percentage of data removed too high [{percent_rejected}]')
 
     else:
         return trial_data, trial_labels
@@ -247,7 +229,7 @@ def _remove_bad_data_by_sequence(trial_data, trial_labels, parameters, trials_pe
             data = trial_data[ch][trial]
             # evaluate voltage samples from this sequence
             # by iterating through trials within the sequence
-            for trials_within_sequence in range(trials_per_sequence):
+            for _ in range(trials_per_sequence):
                 response = evaluator.evaluate(data)
                 if not response:
                     rejection_suggestions += 1
@@ -261,7 +243,8 @@ def _remove_bad_data_by_sequence(trial_data, trial_labels, parameters, trials_pe
                         trial_number -= trials_per_sequence
                         rejected_sequences += 1
                         break
-            else: continue
+            else:
+                continue
             break
         rejection_suggestions = 0
         trial += trials_per_sequence
@@ -270,13 +253,13 @@ def _remove_bad_data_by_sequence(trial_data, trial_labels, parameters, trials_pe
 
     if estimate:
 
-        print("Percent Rejected Sequence w/ Estimated Threshold: " + str(percent_rejected))
+        print('Percent Rejected Sequence w/ Estimated Threshold: ' + str(percent_rejected))
 
-    else: print("Percent Rejected Sequence: " + str(percent_rejected))
+    else: print('Percent Rejected Sequence: ' + str(percent_rejected))
 
     if percent_rejected > 50.0:
 
-        return []
+        raise Exception(f'Percentage of data removed too high [{percent_rejected}]')
 
     else:
         return trial_data, trial_labels
