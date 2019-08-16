@@ -138,6 +138,7 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters,estimate):
     # get enabled rules
     high_voltage_enabled = parameters['high_voltage_threshold']
     low_voltage_enabled = parameters['low_voltage_threshold']
+    rejection_threshold = parameters['rejection_threshold']
 
     # invoke evaluator / rules
     evaluator = Evaluator(parameters, high_voltage_enabled, low_voltage_enabled)
@@ -173,13 +174,10 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters,estimate):
 
     percent_rejected = (rejected_trials / 1000) * 100
 
-    if estimate:
+    print('Percent Rejected Trial: ' + str(percent_rejected))
 
-        print('Percent Rejected Trial w/ Estimated Threshold: ' + str(percent_rejected))
+    if percent_rejected > rejection_threshold:
 
-    else: print('Percent Rejected Trial: ' + str(percent_rejected))
-
-    if percent_rejected > 50.0:
         raise Exception(f'Percentage of data removed too high [{percent_rejected}]')
 
     else:
@@ -195,16 +193,11 @@ def _remove_bad_data_by_sequence(trial_data, trial_labels, parameters, trials_pe
         parameter(dict): parameters to pull information for enabled rules and threshold values
 
     """
-    if estimate:
-        # estimate best thresholds
-        upper = np.amax(trial_data) * 0.3
-        lower = np.amin(trial_data) * 0.15
-        parameters['high_voltage_value'] = upper
-        parameters['low_voltage_value'] = lower
 
     # get enabled rules
     high_voltage_enabled = parameters['high_voltage_threshold']
     low_voltage_enabled = parameters['low_voltage_threshold']
+    rejection_threshold = parameters['rejection_threshold']
 
     # invoke evaluator / rules
     evaluator = Evaluator(parameters, high_voltage_enabled, low_voltage_enabled)
@@ -215,49 +208,38 @@ def _remove_bad_data_by_sequence(trial_data, trial_labels, parameters, trials_pe
     # looping criteria changes by number of trials in a sequence rather than 1
     # which is used in _remove_bad_data_by_trial
     trial_number = trial_data[0].shape[0]
-
-    sequences = trial_number // trials_per_sequence
+    num_trials = trial_data[0].shape[0]
 
     trial = 0
-    rejected_sequences = 0
-    rejection_suggestions = 0
-    bad_trial_threshold = 1
+    rejected_trials = 0
 
     while trial < trial_number:
         # go channel-wise through trials
         for ch in range(channel_number):
-            data = trial_data[ch][trial]
+            sequence_end = trial + trials_per_sequence
+            data = trial_data[ch][trial:sequence_end]
             # evaluate voltage samples from this sequence
             # by iterating through trials within the sequence
-            for _ in range(trials_per_sequence):
-                response = evaluator.evaluate(data)
-                if not response:
-                    rejection_suggestions += 1
-                    if rejection_suggestions >= bad_trial_threshold:
-                        # if the evaluator rejects the data and we've reached
-                        # the threshold, then delete the entire sequence from each channel,
-                        # adjust trial labels to follow suit, then exit the loop
-                        sequence_end = trial + trials_per_sequence
-                        trial_data = np.delete(trial_data, np.s_[trial:sequence_end], axis=1)
-                        trial_labels = np.delete(trial_labels, np.s_[trial:sequence_end])
-                        trial_number -= trials_per_sequence
-                        rejected_sequences += 1
-                        break
-            else:
-                continue
-            break
+            response = evaluator.evaluate(data)
+            if not response:
+                # if the evaluator rejects the data and we've reached
+                # the threshold, then delete the entire sequence from each channel,
+                # adjust trial labels to follow suit, then exit the loop
+                trial_data = np.delete(trial_data, np.s_[trial:sequence_end], axis=1)
+                trial_labels = np.delete(trial_labels, np.s_[trial:sequence_end])
+                trial_number -= trials_per_sequence
+                rejected_trials += trials_per_sequence
+                break
+
         rejection_suggestions = 0
         trial += trials_per_sequence
 
-    percent_rejected = (rejected_sequences / sequences) * 100
+    percent_rejected = (rejected_trials / num_trials ) * 100
 
-    if estimate:
 
-        print('Percent Rejected Sequence w/ Estimated Threshold: ' + str(percent_rejected))
+    print('Percent Rejected Sequence-based: ' + str(percent_rejected))
 
-    else: print('Percent Rejected Sequence: ' + str(percent_rejected))
-
-    if percent_rejected > 50.0:
+    if percent_rejected > rejection_threshold:
 
         raise Exception(f'Percentage of data removed too high [{percent_rejected}]')
 
