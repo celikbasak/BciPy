@@ -89,6 +89,9 @@ def offline_analysis(data_folder: str = None,
                                 channel_map=channel_map,
                                 trial_length=trial_length)
 
+    print(np.amax(x))
+    print(np.amin(x))
+
     x_trial, y_trial, tr_trial = _remove_bad_data_by_trial(x, y, parameters, False)
     trials_per_sequence = parameters['stim_length']
     x_sequence, y_sequence, tr_sequence = _remove_bad_data_by_sequence(x, y, parameters, trials_per_sequence, False)
@@ -101,6 +104,7 @@ def offline_analysis(data_folder: str = None,
     if tr_sequence != 0:
         model, auc_sequence = train_pca_rda_kde_model(x_sequence, y_sequence, k_folds=k_folds)
         print("AUC Sequence: " + str(auc_sequence))
+
 
     # log.info('Saving offline analysis plots!')
 
@@ -142,6 +146,7 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters,estimate):
     # iterate over trial data, evaluate the trials, remove if needed and modify the trial labels to reflect
     channel_number = trial_data.shape[0]
     trial_number = trial_data[0].shape[0]
+    num_trials = trial_data[0].shape[0]
 
     trial = 0
     rejected_trials = 0
@@ -168,9 +173,9 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters,estimate):
         rejection_suggestions = 0 
         trial += 1
 
-    percent_rejected = (rejected_trials / 1000) * 100
+    percent_rejected = (rejected_trials / num_trials) * 100
 
-    print('Percent Rejected Trial: ' + str(percent_rejected))
+    print('Number Rejected Trial-based: ' + str(rejected_trials))
 
     if percent_rejected > rejection_threshold:
 
@@ -232,8 +237,7 @@ def _remove_bad_data_by_sequence(trial_data, trial_labels, parameters, trials_pe
 
     percent_rejected = (rejected_trials / num_trials ) * 100
 
-
-    print('Percent Rejected Sequence-based: ' + str(percent_rejected))
+    print('Number Rejected Sequence-based: ' + str(rejected_trials))
 
     if percent_rejected > rejection_threshold:
 
