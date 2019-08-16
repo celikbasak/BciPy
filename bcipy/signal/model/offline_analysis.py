@@ -93,11 +93,6 @@ def offline_analysis(data_folder: str = None,
     trials_per_sequence = parameters['stim_length']
     x_sequence, y_sequence = _remove_bad_data_by_sequence(x, y, parameters, trials_per_sequence, False)
 
-    if x_sequence == [] or x_trial == []:
-
-        log.info('Model cannot be saved. Number of artifacts above threshold.')
-        return 'Bad calibration data.'
-
     k_folds = parameters.get('k_folds', 10)
 
     model, auc_trial = train_pca_rda_kde_model(x_trial, y_trial, k_folds=k_folds)
