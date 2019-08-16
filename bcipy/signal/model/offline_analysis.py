@@ -89,17 +89,18 @@ def offline_analysis(data_folder: str = None,
                                 channel_map=channel_map,
                                 trial_length=trial_length)
 
-    x_trial, y_trial = _remove_bad_data_by_trial(x, y, parameters, False)
+    x_trial, y_trial, tr_trial = _remove_bad_data_by_trial(x, y, parameters, False)
     trials_per_sequence = parameters['stim_length']
-    x_sequence, y_sequence = _remove_bad_data_by_sequence(x, y, parameters, trials_per_sequence, False)
+    x_sequence, y_sequence, tr_sequence = _remove_bad_data_by_sequence(x, y, parameters, trials_per_sequence, False)
 
     k_folds = parameters.get('k_folds', 10)
 
-    model, auc_trial = train_pca_rda_kde_model(x_trial, y_trial, k_folds=k_folds)
-    model, auc_sequence = train_pca_rda_kde_model(x_sequence, y_sequence, k_folds=k_folds)
-
-    print("AUC Trial: " + str(auc_trial))
-    print("AUC Sequence: " + str(auc_sequence))
+    if tr_trial != 0:
+        model, auc_trial = train_pca_rda_kde_model(x_trial, y_trial, k_folds=k_folds)
+        print("AUC Trial: " + str(auc_trial))
+    if tr_sequence != 0:
+        model, auc_sequence = train_pca_rda_kde_model(x_sequence, y_sequence, k_folds=k_folds)
+        print("AUC Sequence: " + str(auc_sequence))
 
     # log.info('Saving offline analysis plots!')
 
@@ -176,7 +177,7 @@ def _remove_bad_data_by_trial(trial_data, trial_labels, parameters,estimate):
         raise Exception(f'Percentage of data removed too high [{percent_rejected}]')
 
     else:
-        return trial_data, trial_labels
+        return trial_data, trial_labels, percent_rejected
 
 def _remove_bad_data_by_sequence(trial_data, trial_labels, parameters, trials_per_sequence,estimate):
     """Remove Bad Data By Sequence.
@@ -239,7 +240,7 @@ def _remove_bad_data_by_sequence(trial_data, trial_labels, parameters, trials_pe
         raise Exception(f'Percentage of data removed too high [{percent_rejected}]')
 
     else:
-        return trial_data, trial_labels
+        return trial_data, trial_labels, percent_rejected
     
 if __name__ == "__main__":
     import argparse

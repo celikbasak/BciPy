@@ -924,4 +924,5 @@
     "helpTip": "Set threshold for rejected trials in artifact rejection.",
     "recommended_values": "",
     "type": "float"
+    }
 }
